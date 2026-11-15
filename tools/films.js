@@ -55,7 +55,7 @@ var FILMDB = (function () {
   }
   function priceFor(f) { return st.fmt === 'any' ? minPrice(f) : minPrice(f, st.fmt); }
   function lightLabel(k) { var l = LIGHT.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : ''; }
-  function pageUrl(hash) { return location.href.split('#')[0] + '#' + hash; }
+  function pageUrl(hash) { return location.origin + location.pathname + '#' + hash; }
 
   /* ---------- Как снимать на Pentax MX ---------- */
   var MX_T = [1 / 1000, 1 / 500, 1 / 250, 1 / 125, 1 / 60, 1 / 30, 1 / 15, 1 / 8, 1 / 4, 1 / 2, 1];
