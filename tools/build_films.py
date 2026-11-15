@@ -95,6 +95,18 @@ def main():
         for p in f['photos']:
             if 'title' in p: p['title'] = re.sub(r'\.(jpe?g|png|webp|tiff?)$', '', p['title'], flags=re.I).strip() or None
             if not p.get('title'): p.pop('title', None)
+    # Снимки по темам быстрого выбора — отдельный файл, страница грузит его, только когда тема выбрана
+    th_path = os.path.join(HERE, 'theme_photos.json')
+    if os.path.exists(th_path):
+        themes = {}
+        for fid, by in json.load(open(th_path, encoding='utf-8')).items():
+            for tid, L in by.items():
+                L = [p for p in L if p.get('local') and os.path.exists(os.path.join(ROOT, p['local'] + '.jpg')) and os.path.exists(os.path.join(ROOT, p['local'] + '-t.jpg'))]
+                if L:
+                    themes.setdefault(tid, {})[fid] = [dict({k: p[k] for k in keep if p.get(k) not in (None, '')},
+                                                            thumb=p['local'] + '-t.jpg', full=p['local'] + '.jpg') for p in L]
+        json.dump(themes, open(os.path.join(ROOT, 'photos', 'themes.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+        print('снимки по темам:', {t: sum(len(v) for v in d.values()) for t, d in themes.items()})
     subjects = [r[0]['v'] for r in sheets['Списки'][1:] if r and r[0]['v']]
     d = max(dates) if dates else ''
     data = {'films': films, 'shops': SHOPS, 'subjects': subjects,

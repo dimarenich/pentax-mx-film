@@ -25,18 +25,32 @@ var FILMDB = (function () {
   var SUBJECTS = D.subjects;
 
   var PRESETS = [
-    ['Портрет на улице', { subject: 'Портрет на улице' }],
-    ['Портрет в помещении', { subject: 'Портрет в помещении' }],
-    ['Яркое солнце', { light: ['sun'] }],
-    ['Пасмурно и туман', { light: ['cloud', 'uni'] }],
-    ['Вечер и ночь', { light: ['night', 'lamp'] }],
-    ['Стрит', { subject: 'Стрит' }],
-    ['Пейзаж', { subject: 'Пейзаж и природа' }],
-    ['Путешествия', { subject: 'Путешествия' }],
+    ['Портрет на улице', { subject: 'Портрет на улице' }, 'portrait-out'],
+    ['Портрет в помещении', { subject: 'Портрет в помещении' }, 'portrait-in'],
+    ['Яркое солнце', { light: ['sun'] }, 'sun'],
+    ['Пасмурно и туман', { light: ['cloud', 'uni'] }, 'fog'],
+    ['Вечер и ночь', { light: ['night', 'lamp'] }, 'night'],
+    ['Стрит', { subject: 'Стрит' }, 'street'],
+    ['Пейзаж', { subject: 'Пейзаж и природа' }, 'landscape'],
+    ['Путешествия', { subject: 'Путешествия' }, 'travel'],
     ['Классическая ч/б', { type: ['Ч/б негатив', 'Ч/б хромоген'] }],
-    ['Кино‑эстетика', { subject: 'Кино-эстетика' }],
+    ['Кино‑эстетика', { subject: 'Кино-эстетика' }, 'cine'],
     ['До 1 000 ₽', { max: 1000, sort: 'price' }]
   ];
+  /* Тема быстрого выбора запоминается: на странице плёнки показываются снимки этой темы (photos/themes.json) */
+  var THEME_NAME = {}; PRESETS.forEach(function (p) { if (p[2]) THEME_NAME[p[2]] = p[0]; });
+  var theme = null;
+  try { theme = localStorage.getItem('fdb-theme'); } catch (e) {}
+  if (!THEME_NAME[theme]) theme = null;
+  function setTheme(t) { theme = t || null; try { if (theme) localStorage.setItem('fdb-theme', theme); else localStorage.removeItem('fdb-theme'); } catch (e) {} }
+  var TH = null, thWait = [];
+  function loadThemes(cb) {
+    if (TH) return cb();
+    thWait.push(cb); if (thWait.length > 1) return;
+    var done = function (d) { TH = d || {}; var w = thWait; thWait = []; w.forEach(function (f) { f(); }); };
+    fetch('photos/themes.json').then(function (r) { return r.ok ? r.json() : {}; }).then(done, function () { done({}); });
+  }
+  function themeList(fid) { return (TH && theme && TH[theme] && TH[theme][fid]) || []; }
   var BUDGET = [600, 800, 1000, 1200, 1500, 2000, 2500, 3000, 99999];
   var MAXCMP = 3;
 
@@ -183,7 +197,7 @@ var FILMDB = (function () {
       (f.note ? '<p class="fdb-note">' + esc(f.note) + '</p>' : '') +
       '<div class="fdb-buy">' + (p ? '<span class="fdb-from">от <b>' + rub(p.price) + '</b> · ' + esc(p.shop) + ' · ' + esc(p.fmt) + (p.perFrame ? ' · ' + rub(p.perFrame) + '/кадр' : '') + '</span>' : '<span class="fdb-from">нет в наличии</span>') +
       (!mx ? '<span class="fdb-warn">Только 120 — в Pentax MX не встанет</span>' : '') + '</div>' +
-      photosBlock(f, o.open) +
+      (o.open && theme ? themeSlot(f) : '') + photosBlock(f, o.open) +
       '<details class="fdb-det fdb-det-mx"' + (o.open ? ' open' : '') + '><summary>Как снимать на Pentax MX</summary>' + mxBlock(f) + '</details>' +
       '<details class="fdb-det"' + (o.open ? ' open' : '') + '><summary>Цены в магазинах (' + f.prices.length + ')</summary>' + pricesTable(f) +
       '<p class="fdb-subj"><span>Сюжеты:</span> ' + f.subjects.map(esc).join(' · ') + '</p></details>' +
@@ -298,6 +312,7 @@ var FILMDB = (function () {
       '<p class="fdb-lead">' + FILMS.length + ' плёнок, ' + nPrices + ' цен в ' + SHOPS.length + ' магазинах. Выберите сюжет и свет — справочник покажет, что брать. Отметьте до трёх плёнок кнопкой «+ Сравнить», чтобы поставить их рядом. Цены проверены <b>' + esc(D.priceDate) + '</b>, перед покупкой сверьте на сайте магазина.</p>' +
       '<section class="fdb-panel" aria-label="Подбор плёнки">' +
       '<div class="fdb-row"><span class="fdb-lab">Быстрый выбор</span><div class="fdb-presets">' + PRESETS.map(function (p, i) { return '<button type="button" class="fdb-preset" data-i="' + i + '">' + esc(p[0]) + '</button>'; }).join('') + '</div></div>' +
+      '<div id="fdbTheme"></div>' +
       '<div class="fdb-grid">' +
       '<label class="fdb-field"><span class="fdb-lab">Сюжет</span><select id="fdbSubj"><option value="">Любой</option>' + SUBJECTS.map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select></label>' +
       '<label class="fdb-field"><span class="fdb-lab">Слово в описании</span><input id="fdbQ" type="search" placeholder="неон, тёплый, кожа…"></label>' +
@@ -344,6 +359,7 @@ var FILMDB = (function () {
     q('#fdbMax').value = BUDGET.indexOf(st.max) === -1 ? BUDGET.length - 1 : BUDGET.indexOf(st.max);
     q('#fdbMaxV').textContent = st.max >= 99999 ? 'без ограничения' : rub(st.max);
     root.querySelectorAll('.fdb-preset').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.i === st.preset)); });
+    q('#fdbTheme').innerHTML = theme ? '<div class="fdb-themebar">Примеры снимков на страницах плёнок — по теме <b>' + esc(THEME_NAME[theme]) + '</b> <button type="button" class="fdb-act" data-untheme="1">Показывать все примеры</button></div>' : '';
   }
   var DIR_TXT = {
     price: ['дешевле → дороже', 'дороже → дешевле'], iso: ['ISO: меньше → больше', 'ISO: больше → меньше'],
@@ -376,15 +392,16 @@ var FILMDB = (function () {
     }
     if (b.dataset.cmpclear) { cmp = []; saveCmp(); refreshCmp(); return; }
     if (b.dataset.share) { share(b.dataset.share, b); return; }
-    if (b.dataset.phf) { lbOpen(byId[b.dataset.phf], +b.dataset.phi, b); return; }
+    if (b.dataset.phf) { var set = b.dataset.set || 'all', ff = byId[b.dataset.phf]; lbOpen(photoList(ff.id, set), ff.name + (set === 'theme' ? ' · ' + THEME_NAME[theme] : ''), +b.dataset.phi, b); return; }
+    if (b.dataset.untheme) { setTheme(null); if (mode === 'film') render(root, location.hash.slice(1)); else update(); return; }
     if (mode !== 'list') return;
     if (b.classList.contains('fdb-preset')) {
       var k = +b.dataset.i, keepFmt = st.fmt, keepView = st.view, keepDir = st.dir;
-      if (st.preset === k) { st = fresh(); } else { st = fresh(); Object.keys(PRESETS[k][1]).forEach(function (key) { st[key] = PRESETS[k][1][key]; }); st.preset = k; }
+      if (st.preset === k) { st = fresh(); setTheme(null); } else { st = fresh(); Object.keys(PRESETS[k][1]).forEach(function (key) { st[key] = PRESETS[k][1][key]; }); st.preset = k; setTheme(PRESETS[k][2]); }
       st.fmt = keepFmt; st.view = keepView; st.dir = keepDir; update(); return;
     }
     if (b.id === 'fdbDir') { st.dir = -st.dir; dirLabel(); draw(); return; }
-    if (b.id === 'fdbReset') { st = fresh(); update(); return; }
+    if (b.id === 'fdbReset') { st = fresh(); setTheme(null); update(); return; }
     if (b.dataset.fmt) { st.fmt = b.dataset.fmt; update(); return; }
     if (b.dataset.view) { st.view = b.dataset.view; update(); return; }
     var box = b.closest('.fdb-chips'); if (!box || !box.dataset.k) return;
@@ -404,20 +421,42 @@ var FILMDB = (function () {
     var P = f.photos || [];
     if (!P.length) return '<p class="fdb-nophoto">Примеров снимков под свободной лицензией пока не нашлось.</p>';
     var nMx = P.filter(function (p) { return p.mx; }).length;
-    return '<details class="fdb-det fdb-det-ph" data-ph="' + f.id + '"' + (open ? ' open' : '') + '><summary>Примеры снимков (' + P.length + ')' + (nMx ? ' · ' + nMx + ' на Pentax MX' : '') + '</summary><div class="fdb-ph-grid"></div>' +
+    return '<details class="fdb-det fdb-det-ph" data-ph="' + f.id + '" data-set="all"' + (open ? ' open' : '') + '><summary>' + (open && theme ? 'Все примеры снимков' : 'Примеры снимков') + ' (' + P.length + ')' + (nMx ? ' · ' + nMx + ' на Pentax MX' : '') + '</summary><div class="fdb-ph-grid"></div>' +
       '<p class="fdb-fine">Снимки разных фотографов под свободными лицензиями (CC0, CC BY, CC BY‑SA), копии хранятся на этом сайте. Цвет и контраст зависят от сканирования и обработки — смотрите на характер и зерно. Нажмите на снимок, чтобы увеличить: там автор, лицензия и ссылка на оригинал.</p></details>';
   }
+  function photoList(fid, set) { return set === 'theme' ? themeList(fid) : byId[fid].photos; }
   function fillPhotos(det) {
     var g = det.querySelector('.fdb-ph-grid');
     if (!g || g.childElementCount) return;
-    var f = byId[det.dataset.ph];
-    g.innerHTML = f.photos.map(function (p, i) {
-      return '<button type="button" class="fdb-ph" data-phf="' + f.id + '" data-phi="' + i + '" aria-label="Увеличить снимок ' + (i + 1) + ': ' + esc(p.author) + '">' +
+    var f = byId[det.dataset.ph], set = det.dataset.set || 'all';
+    g.innerHTML = photoList(f.id, set).map(function (p, i) {
+      return '<button type="button" class="fdb-ph" data-phf="' + f.id + '" data-set="' + set + '" data-phi="' + i + '" aria-label="Увеличить снимок ' + (i + 1) + ': ' + esc(p.author) + '">' +
         '<img src="' + esc(p.thumb) + '" alt="' + esc(f.name + ' — пример снимка ' + (i + 1)) + '" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest(\'.fdb-ph\').hidden=true">' +
         (p.mx ? '<span class="fdb-ph-mx">MX</span>' : '') + '</button>';
     }).join('');
   }
-  var lb = null, lbF = null, lbI = 0, lbBack = null;
+  function themeSlot(f) { return '<div class="fdb-themeslot" data-film="' + f.id + '"></div>'; }
+  function fillThemeSlots(content) {
+    var slots = content.querySelectorAll('.fdb-themeslot');
+    if (!slots.length || !theme) return;
+    loadThemes(function () {
+      slots.forEach(function (slot) {
+        var f = byId[slot.dataset.film], L = themeList(f.id), name = THEME_NAME[theme];
+        var all = slot.parentNode.querySelector('.fdb-det-ph[data-set="all"]');
+        var bar = '<div class="fdb-themebar">Тема из быстрого выбора: <b>' + esc(name) + '</b> <button type="button" class="fdb-act" data-untheme="1">Показывать все примеры</button></div>';
+        if (!L.length) {
+          slot.innerHTML = bar + '<p class="fdb-nophoto">Снимков на тему «' + esc(name) + '» для этой плёнки пока не нашлось — ниже все примеры.</p>';
+          if (all) { all.open = true; fillPhotos(all); }
+          return;
+        }
+        slot.innerHTML = bar + '<details class="fdb-det fdb-det-ph fdb-det-theme" data-ph="' + f.id + '" data-set="theme" open><summary>Примеры: ' + esc(name) + ' (' + L.length + ')</summary><div class="fdb-ph-grid"></div>' +
+          '<p class="fdb-fine">Снимки на эту плёнку по теме «' + esc(name) + '». Все примеры — в блоке ниже.</p></details>';
+        fillPhotos(slot.querySelector('details'));
+        if (all) all.open = false;
+      });
+    });
+  }
+  var lb = null, lbI = 0, lbBack = null;
   function lbEl() {
     if (lb) return lb;
     lb = document.createElement('div'); lb.className = 'fdb-lb'; lb.hidden = true;
@@ -456,55 +495,60 @@ var FILMDB = (function () {
     return lb;
   }
   function lbZoom(e) {
-    var img = e.target, stage = lb.querySelector('.fdb-lb-stage'), p = lbF.photos[lbI];
+    var img = e.target, stage = lb.querySelector('.fdb-lb-stage');
     if (lb.classList.contains('zoom')) { lb.classList.remove('zoom'); return; }
+    if (!lb.classList.contains('can-zoom')) return;
     var r = img.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-    function go() {
-      if (img.naturalWidth <= img.clientWidth * 1.05) { lbHint('Этот снимок уже показан в полную величину — больше деталей в файле нет'); return; }
-      lb.classList.add('zoom');
-      stage.scrollLeft = fx * img.naturalWidth - stage.clientWidth / 2;
-      stage.scrollTop = fy * img.naturalHeight - stage.clientHeight / 2;
-    }
-    if (img.getAttribute('src') !== p.full) {  /* большая версия ещё не подставлена — дождёмся её */
-      lbHint('Загружаю снимок в полном размере…');
-      img.onload = function () { img.onload = null; if (lbF.photos[lbI] === p) { lbHint(''); go(); } };
-      img.src = p.full; return;
-    }
-    go();
+    lb.classList.add('zoom');
+    stage.scrollLeft = fx * img.naturalWidth - stage.clientWidth / 2;
+    stage.scrollTop = fy * img.naturalHeight - stage.clientHeight / 2;
   }
-  function lbHint(t) {
-    var h = lb.querySelector('.fdb-lb-hint');
-    if (h) h.textContent = t || 'Нажмите на снимок — увеличение 1:1, чтобы рассмотреть зерно';
+  function preload(p) { if (p && !p._pre) { p._pre = new Image(); p._pre.src = p.full; } }
+  function lbFit() {  /* увеличение 1:1 имеет смысл, только если файл крупнее того, что на экране */
+    var img = lb.querySelector('.fdb-lb-img');
+    var can = img.naturalWidth > img.clientWidth * 1.05;
+    lb.classList.toggle('can-zoom', can);
+    var h = lb.querySelector('.fdb-lb-hint'); if (h) h.hidden = !can;
   }
   function lbShow() {
-    lb.classList.remove('zoom');
-    var P = lbF.photos, p = P[lbI], img = lb.querySelector('.fdb-lb-img');
-    img.src = p.thumb; img.alt = lbF.name + ' — пример снимка ' + (lbI + 1);
-    img.onload = null;
-    var full = new Image(); full.referrerPolicy = 'no-referrer'; full.onload = function () { if (P[lbI] === p) img.src = p.full; }; full.src = p.full;
-    lb.querySelector('.fdb-lb-n').textContent = lbF.name + ' · ' + (lbI + 1) + ' из ' + P.length;
+    lb.classList.remove('zoom', 'can-zoom');
+    var P = lbList, p = P[lbI], img = lb.querySelector('.fdb-lb-img');
+    lb.classList.add('loading');
+    img.onload = function () { if (P[lbI] !== p) return; lb.classList.remove('loading'); lbFit(); };
+    img.onerror = function () { lb.classList.remove('loading'); };
+    img.alt = lbName + ' — пример снимка ' + (lbI + 1);
+    img.src = p.full;  /* сразу большой снимок, без промежуточной миниатюры */
+    if (img.complete && img.naturalWidth) img.onload();
+    preload(P[(lbI + 1) % P.length]); preload(P[(lbI - 1 + P.length) % P.length]);
+    lb.querySelector('.fdb-lb-n').textContent = lbName + ' · ' + (lbI + 1) + ' из ' + P.length;
     lb.querySelector('.fdb-lb-cap').innerHTML = (p.mx ? '<span class="fdb-ph-mx">Pentax MX</span> ' : '') + (p.title ? '«' + esc(p.title) + '» · ' : '') +
       'Автор: ' + esc(p.author) + ' · ' + (p.licenseUrl ? '<a href="' + esc(p.licenseUrl) + '" target="_blank" rel="noopener">' + esc(p.license) + '</a>' : esc(p.license)) +
       ' · <a href="' + esc(p.page) + '" target="_blank" rel="noopener">оригинал у автора ↗</a>' +
-      '<span class="fdb-lb-hint">Нажмите на снимок — увеличение 1:1, чтобы рассмотреть зерно</span>';
+      '<span class="fdb-lb-hint" hidden>Нажмите на снимок — увеличение 1:1, чтобы рассмотреть зерно</span>';
   }
-  function lbOpen(f, i, from) {
-    lbEl(); lbF = f; lbI = i; lbBack = from; lb.hidden = false; document.documentElement.classList.add('fdb-lb-on'); lbShow();
+  var lbList = [], lbName = '';
+  function lbOpen(list, name, i, from) {
+    lbEl(); lbList = list; lbName = name; lbI = i; lbBack = from; lb.hidden = false; document.documentElement.classList.add('fdb-lb-on'); lbShow();
     lb.querySelector('.fdb-lb-x').focus();
   }
-  function lbGo(d) { var n = lbF.photos.length; lbI = (lbI + d + n) % n; lbShow(); }
-  function lbClose() { lb.hidden = true; lb.querySelector('.fdb-lb-img').removeAttribute('src'); document.documentElement.classList.remove('fdb-lb-on'); if (lbBack) lbBack.focus(); }
+  function lbGo(d) { var n = lbList.length; lbI = (lbI + d + n) % n; lbShow(); }
+  function lbClose() { lb.hidden = true; var img = lb.querySelector('.fdb-lb-img'); img.onload = null; img.removeAttribute('src'); document.documentElement.classList.remove('fdb-lb-on'); if (lbBack) lbBack.focus(); }
+  window.addEventListener('resize', function () { if (lb && !lb.hidden && !lb.classList.contains('loading')) lbFit(); });
+  function onHover(e) {
+    var b = e.target.closest && e.target.closest('.fdb-ph');
+    if (b && b.dataset.phf) preload(photoList(b.dataset.phf, b.dataset.set || 'all')[+b.dataset.phi]);
+  }
   function onToggle(e) { var d = e.target; if (d.classList && d.classList.contains('fdb-det-ph') && d.open) fillPhotos(d); }
 
   var bound = null;
   /* hash: 'films' | 'film-<id>' | 'compare-<id>+<id>' ; returns page title */
   function render(content, hash) {
     root = content;
-    if (bound !== content) { content.addEventListener('click', onClick); content.addEventListener('toggle', onToggle, true); bound = content; }
+    if (bound !== content) { content.addEventListener('click', onClick); content.addEventListener('toggle', onToggle, true); content.addEventListener('pointerover', onHover); content.addEventListener('touchstart', onHover, { passive: true }); content.addEventListener('focusin', onHover); bound = content; }
     hash = hash || 'films';
     if (hash.indexOf('film-') === 0) {
       var f = byId[hash.slice(5)];
-      if (f) { mode = 'film'; content.innerHTML = filmView(f); content.querySelectorAll('.fdb-det-ph[open]').forEach(fillPhotos); refreshCmp(); return f.name; }
+      if (f) { mode = 'film'; content.innerHTML = filmView(f); content.querySelectorAll('.fdb-det-ph[open]').forEach(fillPhotos); fillThemeSlots(content); refreshCmp(); return f.name; }
     }
     if (hash.indexOf('compare-') === 0) {
       var ids = hash.slice(8).split('+').filter(function (id) { return byId[id]; }).slice(0, MAXCMP);
