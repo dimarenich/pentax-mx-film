@@ -33,6 +33,14 @@ SHOPS = [
 LIGHT = {'Яркий день': 'sun', 'День и пасмурно': 'cloud', 'Универсальная': 'uni', 'Вечер и ночь': 'night', 'Лампы': 'lamp'}
 
 
+TR = dict(zip('абвгдеёзийклмнопрстуфхъыьэ', ['a','b','v','g','d','e','e','z','i','y','k','l','m','n','o','p','r','s','t','u','f','h','','y','','e']))
+TR.update({'ж': 'zh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ю': 'yu', 'я': 'ya'})
+
+
+def translit(s):
+    return ''.join(TR.get(c, c) for c in s)
+
+
 def num(s):
     s = re.sub(r'[^\d.,]', '', s or '').replace(',', '')
     return int(float(s)) if s else None
@@ -45,12 +53,14 @@ def main():
 
     F = sheets['Плёнки']; h = [c['v'] for c in F[0]]
     col = lambda r, name: (r[h.index(name)]['v'].strip() if len(r) > h.index(name) else '')
-    films, ids = [], {}
+    films, ids, used = [], {}, set()
     for r in F[1:]:
         name = col(r, 'Плёнка')
         if not name: continue
         light = next((v for k, v in LIGHT.items() if k in col(r, 'Свет / время')), 'uni')
-        fid = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-') or str(len(films))
+        fid = re.sub(r'[^a-z0-9]+', '-', translit(name.lower())).strip('-') or str(len(films))
+        while fid in used: fid += '-2'
+        used.add(fid)
         ids[name] = len(films)
         films.append({'id': fid, 'name': name, 'type': col(r, 'Тип'), 'iso': num(col(r, 'ISO')) or 0, 'light': light,
                       'subjects': [s.strip() for s in col(r, 'Сюжеты').split(',') if s.strip()],
@@ -91,6 +101,7 @@ def main():
         assert html.count(anchor) == 1
         html = html.replace(anchor, block + anchor)
     html = patch_app(html)
+    html = patch_v2(html)
     open(INDEX, 'w', encoding='utf-8').write(html)
     print(len(films), 'плёнок,', sum(len(f['prices']) for f in films), 'цен, дата цен', data['priceDate'])
     if missing: print('В «Цены» есть плёнки, которых нет на листе «Плёнки»:', ', '.join(sorted(missing)))
@@ -98,7 +109,7 @@ def main():
 
 def patch_app(html):
     """Одноразовые правки основного скрипта курса: пункт меню, маршрут #films, поиск."""
-    if 'function renderFilms()' in html:
+    if 'function renderFilms(' in html:
         return html
     R = [
         ("    navList.appendChild(box);\n  });\n",
@@ -129,6 +140,25 @@ def patch_app(html):
          "      var ok = !q || (m ? (m.title + ' ' + m.md).toLowerCase() : FILMDB.searchText).indexOf(q) !== -1;\n"),
         ("    render(/^m\\d\\d$/.test(cur) ? cur : 'm00', true);\n",
          "    if (cur === 'films') return;\n    render(/^m\\d\\d$/.test(cur) ? cur : 'm00', true);\n"),
+    ]
+    for a, b in R:
+        assert html.count(a) == 1, 'не найден фрагмент: ' + a[:60]
+        html = html.replace(a, b)
+    return html
+
+
+def patch_v2(html):
+    """v2: маршруты #film-<id> и #compare-<id>+<id>, заголовок страницы от справочника."""
+    if 'function renderFilms(hash)' in html:
+        return html
+    R = [
+        ("  function renderFilms() {\n", "  function renderFilms(hash) {\n"),
+        ("    FILMDB.render(content);\n", "    var t = FILMDB.render(content, hash);\n"),
+        ("    document.getElementById('topTitle').textContent = 'Справочник плёнок';\n    document.title = 'Справочник плёнок — Курс плёночной фотографии';\n",
+         "    document.getElementById('topTitle').textContent = t;\n    document.title = t + ' — Курс плёночной фотографии';\n"),
+        ("    if (id === 'films') { renderFilms(); return; }\n",
+         "    if (id === 'films' || /^film-|^compare-/.test(id)) { renderFilms(id); return; }\n"),
+        ("    if (cur === 'films') return;\n", "    if (/^films$|^film-|^compare-/.test(cur)) return;\n"),
     ]
     for a, b in R:
         assert html.count(a) == 1, 'не найден фрагмент: ' + a[:60]
