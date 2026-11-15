@@ -40,7 +40,7 @@ var FILMDB = (function () {
   var BUDGET = [600, 800, 1000, 1200, 1500, 2000, 2500, 3000, 99999];
   var MAXCMP = 3;
 
-  function fresh() { return { subject: '', light: [], type: [], grain: [], contrast: [], dev: [], fmt: '135', max: 99999, q: '', sort: 'price', view: 'cards', preset: -1 }; }
+  function fresh() { return { subject: '', light: [], type: [], grain: [], contrast: [], dev: [], fmt: '135', max: 99999, q: '', sort: 'price', dir: 1, view: 'cards', preset: -1 }; }
   var st = fresh();
   var cmp = [];
   try { cmp = (JSON.parse(localStorage.getItem('fdb-compare') || '[]') || []).filter(function (id) { return byId[id]; }).slice(0, MAXCMP); } catch (e) { cmp = []; }
@@ -129,13 +129,19 @@ var FILMDB = (function () {
     return true;
   }
   function sorted(list) {
-    var by = {
-      price: function (a, b) { var x = priceFor(a), y = priceFor(b); return (x ? x.price : 1e9) - (y ? y.price : 1e9); },
-      iso: function (a, b) { return a.iso - b.iso; },
-      name: function (a, b) { return a.name.localeCompare(b.name, 'ru'); },
-      grain: function (a, b) { return GRAIN.indexOf(a.grain) - GRAIN.indexOf(b.grain); }
+    var key = {
+      price: function (f) { var x = priceFor(f); return x ? x.price : null; },
+      iso: function (f) { return f.iso || null; },
+      grain: function (f) { var i = GRAIN.indexOf(f.grain); return i === -1 ? null : i; },
+      contrast: function (f) { var i = CONTRAST.indexOf(f.contrast); return i === -1 ? null : i; }
     }[st.sort];
-    return list.slice().sort(by);
+    var byName = function (a, b) { return a.name.localeCompare(b.name, 'ru'); };
+    return list.slice().sort(function (a, b) {
+      if (!key) return st.dir * byName(a, b);
+      var x = key(a), y = key(b);
+      if (x === null || y === null) return x === y ? byName(a, b) : x === null ? 1 : -1; /* без значения — всегда в конце */
+      return st.dir * (x - y) || byName(a, b);
+    });
   }
 
   function dots(val, scale, label) {
@@ -177,6 +183,7 @@ var FILMDB = (function () {
       (f.note ? '<p class="fdb-note">' + esc(f.note) + '</p>' : '') +
       '<div class="fdb-buy">' + (p ? '<span class="fdb-from">от <b>' + rub(p.price) + '</b> · ' + esc(p.shop) + ' · ' + esc(p.fmt) + (p.perFrame ? ' · ' + rub(p.perFrame) + '/кадр' : '') + '</span>' : '<span class="fdb-from">нет в наличии</span>') +
       (!mx ? '<span class="fdb-warn">Только 120 — в Pentax MX не встанет</span>' : '') + '</div>' +
+      photosBlock(f, o.open) +
       '<details class="fdb-det fdb-det-mx"' + (o.open ? ' open' : '') + '><summary>Как снимать на Pentax MX</summary>' + mxBlock(f) + '</details>' +
       '<details class="fdb-det"' + (o.open ? ' open' : '') + '><summary>Цены в магазинах (' + f.prices.length + ')</summary>' + pricesTable(f) +
       '<p class="fdb-subj"><span>Сюжеты:</span> ' + f.subjects.map(esc).join(' · ') + '</p></details>' +
@@ -305,7 +312,7 @@ var FILMDB = (function () {
       '<div class="fdb-row"><span class="fdb-lab">Проявка</span><div id="fdbDev"></div></div></details>' +
       '</section>' +
       '<div class="fdb-bar"><span id="fdbCount" class="fdb-count" aria-live="polite"></span>' +
-      '<label class="fdb-sort"><span class="fdb-lab">Сортировка</span><select id="fdbSort"><option value="price">по цене</option><option value="iso">по ISO</option><option value="grain">по зерну</option><option value="name">по названию</option></select></label>' +
+      '<label class="fdb-sort"><span class="fdb-lab">Сортировка</span><select id="fdbSort"><option value="price">по цене</option><option value="iso">по ISO</option><option value="grain">по зерну</option><option value="contrast">по контрасту</option><option value="name">по названию</option></select></label><button type="button" class="fdb-chip fdb-dir" id="fdbDir"></button>' +
       '<div class="fdb-chips" id="fdbView"></div><button type="button" class="fdb-reset" id="fdbReset">Сбросить</button></div>' +
       '<div id="fdbList"></div>' +
       '<div id="fdbCmpBar" class="fdb-cmpwrap"></div>' +
@@ -333,9 +340,20 @@ var FILMDB = (function () {
       return '<button type="button" class="fdb-chip" data-view="' + o[0] + '" aria-pressed="' + (st.view === o[0]) + '">' + o[1] + '</button>';
     }).join('');
     q('#fdbSubj').value = st.subject; q('#fdbQ').value = st.q; q('#fdbSort').value = st.sort;
+    dirLabel();
     q('#fdbMax').value = BUDGET.indexOf(st.max) === -1 ? BUDGET.length - 1 : BUDGET.indexOf(st.max);
     q('#fdbMaxV').textContent = st.max >= 99999 ? 'без ограничения' : rub(st.max);
     root.querySelectorAll('.fdb-preset').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.i === st.preset)); });
+  }
+  var DIR_TXT = {
+    price: ['дешевле → дороже', 'дороже → дешевле'], iso: ['ISO: меньше → больше', 'ISO: больше → меньше'],
+    grain: ['зерно: мельче → крупнее', 'зерно: крупнее → мельче'], contrast: ['контраст: мягче → жёстче', 'контраст: жёстче → мягче'],
+    name: ['А → Я', 'Я → А']
+  };
+  function dirLabel() {
+    var b = root.querySelector('#fdbDir'), t = DIR_TXT[st.sort][st.dir === 1 ? 0 : 1];
+    b.innerHTML = (st.dir === 1 ? '↑ ' : '↓ ') + esc(t);
+    b.setAttribute('aria-label', 'Порядок сортировки: ' + (st.dir === 1 ? 'по возрастанию' : 'по убыванию') + ', ' + t + '. Нажмите, чтобы поменять');
   }
   function draw() {
     var list = sorted(FILMS.filter(match));
@@ -358,12 +376,14 @@ var FILMDB = (function () {
     }
     if (b.dataset.cmpclear) { cmp = []; saveCmp(); refreshCmp(); return; }
     if (b.dataset.share) { share(b.dataset.share, b); return; }
+    if (b.dataset.phf) { lbOpen(byId[b.dataset.phf], +b.dataset.phi, b); return; }
     if (mode !== 'list') return;
     if (b.classList.contains('fdb-preset')) {
-      var k = +b.dataset.i, keepFmt = st.fmt, keepView = st.view;
+      var k = +b.dataset.i, keepFmt = st.fmt, keepView = st.view, keepDir = st.dir;
       if (st.preset === k) { st = fresh(); } else { st = fresh(); Object.keys(PRESETS[k][1]).forEach(function (key) { st[key] = PRESETS[k][1][key]; }); st.preset = k; }
-      st.fmt = keepFmt; st.view = keepView; update(); return;
+      st.fmt = keepFmt; st.view = keepView; st.dir = keepDir; update(); return;
     }
+    if (b.id === 'fdbDir') { st.dir = -st.dir; dirLabel(); draw(); return; }
     if (b.id === 'fdbReset') { st = fresh(); update(); return; }
     if (b.dataset.fmt) { st.fmt = b.dataset.fmt; update(); return; }
     if (b.dataset.view) { st.view = b.dataset.view; update(); return; }
@@ -374,20 +394,117 @@ var FILMDB = (function () {
   }
   function bindList() {
     root.querySelector('#fdbSubj').addEventListener('change', function (e) { st.subject = e.target.value; st.preset = -1; update(); });
-    root.querySelector('#fdbSort').addEventListener('change', function (e) { st.sort = e.target.value; draw(); });
+    root.querySelector('#fdbSort').addEventListener('change', function (e) { st.sort = e.target.value; dirLabel(); draw(); });
     root.querySelector('#fdbQ').addEventListener('input', function (e) { st.q = e.target.value.trim(); st.preset = -1; draw(); });
     root.querySelector('#fdbMax').addEventListener('input', function (e) { st.max = BUDGET[+e.target.value]; st.preset = -1; root.querySelector('#fdbMaxV').textContent = st.max >= 99999 ? 'без ограничения' : rub(st.max); draw(); });
   }
+
+  /* ---------- Примеры снимков и просмотрщик ---------- */
+  function photosBlock(f, open) {
+    var P = f.photos || [];
+    if (!P.length) return '<p class="fdb-nophoto">Примеров снимков под свободной лицензией пока не нашлось.</p>';
+    var nMx = P.filter(function (p) { return p.mx; }).length;
+    return '<details class="fdb-det fdb-det-ph" data-ph="' + f.id + '"' + (open ? ' open' : '') + '><summary>Примеры снимков (' + P.length + ')' + (nMx ? ' · ' + nMx + ' на Pentax MX' : '') + '</summary><div class="fdb-ph-grid"></div>' +
+      '<p class="fdb-fine">Снимки разных фотографов под свободными лицензиями (CC0, CC BY, CC BY‑SA), копии хранятся на этом сайте. Цвет и контраст зависят от сканирования и обработки — смотрите на характер и зерно. Нажмите на снимок, чтобы увеличить: там автор, лицензия и ссылка на оригинал.</p></details>';
+  }
+  function fillPhotos(det) {
+    var g = det.querySelector('.fdb-ph-grid');
+    if (!g || g.childElementCount) return;
+    var f = byId[det.dataset.ph];
+    g.innerHTML = f.photos.map(function (p, i) {
+      return '<button type="button" class="fdb-ph" data-phf="' + f.id + '" data-phi="' + i + '" aria-label="Увеличить снимок ' + (i + 1) + ': ' + esc(p.author) + '">' +
+        '<img src="' + esc(p.thumb) + '" alt="' + esc(f.name + ' — пример снимка ' + (i + 1)) + '" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.closest(\'.fdb-ph\').hidden=true">' +
+        (p.mx ? '<span class="fdb-ph-mx">MX</span>' : '') + '</button>';
+    }).join('');
+  }
+  var lb = null, lbF = null, lbI = 0, lbBack = null;
+  function lbEl() {
+    if (lb) return lb;
+    lb = document.createElement('div'); lb.className = 'fdb-lb'; lb.hidden = true;
+    lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true'); lb.setAttribute('aria-label', 'Просмотр снимка');
+    lb.innerHTML = '<div class="fdb-lb-top"><span class="fdb-lb-n"></span><button type="button" class="fdb-lb-x" aria-label="Закрыть">×</button></div>' +
+      '<div class="fdb-lb-stage"><button type="button" class="fdb-lb-nav fdb-lb-prev" aria-label="Предыдущий снимок">‹</button><img class="fdb-lb-img" alt="" referrerpolicy="no-referrer"><button type="button" class="fdb-lb-nav fdb-lb-next" aria-label="Следующий снимок">›</button></div>' +
+      '<div class="fdb-lb-cap"></div>';
+    document.body.appendChild(lb);
+    lb.addEventListener('click', function (e) {
+      if (e.target.classList.contains('fdb-lb-img')) { if (!dragged) lbZoom(e); return; }
+      if (e.target.closest('.fdb-lb-x') || e.target === lb || (e.target.classList.contains('fdb-lb-stage') && !lb.classList.contains('zoom'))) lbClose();
+      else if (e.target.closest('.fdb-lb-prev')) lbGo(-1);
+      else if (e.target.closest('.fdb-lb-next')) lbGo(1);
+    });
+    var stage = lb.querySelector('.fdb-lb-stage'), drag = null, dragged = false;
+    stage.addEventListener('pointerdown', function (e) {
+      dragged = false;
+      if (!lb.classList.contains('zoom') || e.pointerType === 'touch') return;
+      drag = { x: e.clientX, y: e.clientY, l: stage.scrollLeft, t: stage.scrollTop }; e.preventDefault();
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) dragged = true;
+      stage.scrollLeft = drag.l - dx; stage.scrollTop = drag.t - dy;
+    });
+    window.addEventListener('pointerup', function () { drag = null; });
+    var x0 = null;
+    lb.addEventListener('touchstart', function (e) { x0 = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+    lb.addEventListener('touchend', function (e) { if (x0 == null || lb.classList.contains('zoom')) return; var dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) lbGo(dx < 0 ? 1 : -1); x0 = null; });
+    window.addEventListener('hashchange', function () { if (!lb.hidden) lbClose(); });
+    document.addEventListener('keydown', function (e) {
+      if (lb.hidden) return;
+      if (e.key === 'Escape') lbClose(); else if (e.key === 'ArrowLeft') lbGo(-1); else if (e.key === 'ArrowRight') lbGo(1);
+    });
+    return lb;
+  }
+  function lbZoom(e) {
+    var img = e.target, stage = lb.querySelector('.fdb-lb-stage'), p = lbF.photos[lbI];
+    if (lb.classList.contains('zoom')) { lb.classList.remove('zoom'); return; }
+    var r = img.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    function go() {
+      if (img.naturalWidth <= img.clientWidth * 1.05) { lbHint('Этот снимок уже показан в полную величину — больше деталей в файле нет'); return; }
+      lb.classList.add('zoom');
+      stage.scrollLeft = fx * img.naturalWidth - stage.clientWidth / 2;
+      stage.scrollTop = fy * img.naturalHeight - stage.clientHeight / 2;
+    }
+    if (img.getAttribute('src') !== p.full) {  /* большая версия ещё не подставлена — дождёмся её */
+      lbHint('Загружаю снимок в полном размере…');
+      img.onload = function () { img.onload = null; if (lbF.photos[lbI] === p) { lbHint(''); go(); } };
+      img.src = p.full; return;
+    }
+    go();
+  }
+  function lbHint(t) {
+    var h = lb.querySelector('.fdb-lb-hint');
+    if (h) h.textContent = t || 'Нажмите на снимок — увеличение 1:1, чтобы рассмотреть зерно';
+  }
+  function lbShow() {
+    lb.classList.remove('zoom');
+    var P = lbF.photos, p = P[lbI], img = lb.querySelector('.fdb-lb-img');
+    img.src = p.thumb; img.alt = lbF.name + ' — пример снимка ' + (lbI + 1);
+    img.onload = null;
+    var full = new Image(); full.referrerPolicy = 'no-referrer'; full.onload = function () { if (P[lbI] === p) img.src = p.full; }; full.src = p.full;
+    lb.querySelector('.fdb-lb-n').textContent = lbF.name + ' · ' + (lbI + 1) + ' из ' + P.length;
+    lb.querySelector('.fdb-lb-cap').innerHTML = (p.mx ? '<span class="fdb-ph-mx">Pentax MX</span> ' : '') + (p.title ? '«' + esc(p.title) + '» · ' : '') +
+      'Автор: ' + esc(p.author) + ' · ' + (p.licenseUrl ? '<a href="' + esc(p.licenseUrl) + '" target="_blank" rel="noopener">' + esc(p.license) + '</a>' : esc(p.license)) +
+      ' · <a href="' + esc(p.page) + '" target="_blank" rel="noopener">оригинал у автора ↗</a>' +
+      '<span class="fdb-lb-hint">Нажмите на снимок — увеличение 1:1, чтобы рассмотреть зерно</span>';
+  }
+  function lbOpen(f, i, from) {
+    lbEl(); lbF = f; lbI = i; lbBack = from; lb.hidden = false; document.documentElement.classList.add('fdb-lb-on'); lbShow();
+    lb.querySelector('.fdb-lb-x').focus();
+  }
+  function lbGo(d) { var n = lbF.photos.length; lbI = (lbI + d + n) % n; lbShow(); }
+  function lbClose() { lb.hidden = true; lb.querySelector('.fdb-lb-img').removeAttribute('src'); document.documentElement.classList.remove('fdb-lb-on'); if (lbBack) lbBack.focus(); }
+  function onToggle(e) { var d = e.target; if (d.classList && d.classList.contains('fdb-det-ph') && d.open) fillPhotos(d); }
 
   var bound = null;
   /* hash: 'films' | 'film-<id>' | 'compare-<id>+<id>' ; returns page title */
   function render(content, hash) {
     root = content;
-    if (bound !== content) { content.addEventListener('click', onClick); bound = content; }
+    if (bound !== content) { content.addEventListener('click', onClick); content.addEventListener('toggle', onToggle, true); bound = content; }
     hash = hash || 'films';
     if (hash.indexOf('film-') === 0) {
       var f = byId[hash.slice(5)];
-      if (f) { mode = 'film'; content.innerHTML = filmView(f); refreshCmp(); return f.name; }
+      if (f) { mode = 'film'; content.innerHTML = filmView(f); content.querySelectorAll('.fdb-det-ph[open]').forEach(fillPhotos); refreshCmp(); return f.name; }
     }
     if (hash.indexOf('compare-') === 0) {
       var ids = hash.slice(8).split('+').filter(function (id) { return byId[id]; }).slice(0, MAXCMP);

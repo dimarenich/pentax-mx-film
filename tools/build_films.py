@@ -84,6 +84,17 @@ def main():
         if pc(r, 'Цена на дату'): dates.add(pc(r, 'Цена на дату'))
     for f in films:
         f['prices'] = [p for p in f['prices'] if p['price']]
+    ph_path = os.path.join(HERE, 'photos.json')
+    photos = json.load(open(ph_path, encoding='utf-8')) if os.path.exists(ph_path) else {}
+    keep = ('thumb', 'full', 'author', 'license', 'licenseUrl', 'page', 'mx', 'title')
+    for f in films:
+        L = [p for p in photos.get(f['id'], []) if p.get('local') and os.path.exists(os.path.join(ROOT, p['local'] + '.jpg'))]
+        for p in L:  # показываем копии из папки photos/ сайта, ссылки ведут на оригиналы авторов
+            p['thumb'], p['full'] = p['local'] + '-t.jpg', p['local'] + '.jpg'
+        f['photos'] = [{k: p[k] for k in keep if p.get(k) not in (None, '')} for p in L]
+        for p in f['photos']:
+            if 'title' in p: p['title'] = re.sub(r'\.(jpe?g|png|webp|tiff?)$', '', p['title'], flags=re.I).strip() or None
+            if not p.get('title'): p.pop('title', None)
     subjects = [r[0]['v'] for r in sheets['Списки'][1:] if r and r[0]['v']]
     d = max(dates) if dates else ''
     data = {'films': films, 'shops': SHOPS, 'subjects': subjects,
