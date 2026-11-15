@@ -3543,7 +3543,8 @@
    "page": "https://commons.wikimedia.org/wiki/File:Dachshund_with_snow_flakes_1995.jpg",
    "mx": false,
    "camera": "",
-   "id": "d826b30c43"
+   "id": "d826b30c43",
+   "local": "photos/ilford-xp2-super-400/d826b30c43"
   }
  ],
  "ilford-delta-400": [
@@ -4566,7 +4567,8 @@
    "page": "https://commons.wikimedia.org/w/index.php?curid=82336881",
    "mx": false,
    "tags": "ilfordpan100dxophotolab",
-   "id": "afe28dbcf1"
+   "id": "afe28dbcf1",
+   "local": "photos/ilford-pan-100/afe28dbcf1"
   }
  ],
  "kodak-ektachrome-e100": [
@@ -4907,7 +4909,8 @@
    "page": "https://commons.wikimedia.org/w/index.php?curid=92519911",
    "mx": false,
    "tags": "november2013amsterdamnetherlandolympusxakodakportra800flickrloranger",
-   "id": "d31d6236e7"
+   "id": "d31d6236e7",
+   "local": "photos/kodak-portra-800/d31d6236e7"
   },
   {
    "src": "wikimedia",
@@ -5328,7 +5331,8 @@
    "page": "https://commons.wikimedia.org/wiki/File:September_Storm_on_the_South_Rim_of_the_Grand_Canyon,_2007.jpg",
    "mx": false,
    "camera": "",
-   "id": "38f9c8e8f7"
+   "id": "38f9c8e8f7",
+   "local": "photos/fujifilm-provia-100f/38f9c8e8f7"
   },
   {
    "src": "commons",
@@ -6414,7 +6418,8 @@
    "page": "https://commons.wikimedia.org/w/index.php?curid=24796789",
    "mx": false,
    "tags": "rovemcmanusandtasmawalton6794784659",
-   "id": "cc12207083"
+   "id": "cc12207083",
+   "local": "photos/tasma-tip-42l-400/cc12207083"
   }
  ],
  "kodak-colorplus-200": [
@@ -6819,7 +6824,8 @@
    "page": "https://commons.wikimedia.org/w/index.php?curid=79338526",
    "mx": false,
    "tags": "eastmandoublex26766380873",
-   "id": "5e3bc75739"
+   "id": "5e3bc75739",
+   "local": "photos/kodak-double-x-5222/5e3bc75739"
   },
   {
    "src": "wikimedia",
@@ -6834,7 +6840,8 @@
    "page": "https://commons.wikimedia.org/w/index.php?curid=79338527",
    "mx": false,
    "tags": "eastmandoublex16766379043",
-   "id": "08bff76b27"
+   "id": "08bff76b27",
+   "local": "photos/kodak-double-x-5222/08bff76b27"
   }
  ],
  "kodak-ultramax-400": [
@@ -6915,7 +6922,8 @@
    "page": "https://commons.wikimedia.org/wiki/File:2012_news_seller_Johannesburg_6839637110.jpg",
    "mx": false,
    "camera": "",
-   "id": "42d30fc940"
+   "id": "42d30fc940",
+   "local": "photos/kodak-ultramax-400/42d30fc940"
   },
   {
    "src": "commons",
