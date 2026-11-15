@@ -1,0 +1,233 @@
+/* ===== Справочник плёнок: filters + cards + table + shops ===== */
+var FILMDB = (function () {
+  'use strict';
+  var D = JSON.parse(document.getElementById('films-data').textContent);
+  var FILMS = D.films, SHOPS = D.shops;
+
+  var LIGHT = [
+    ['sun', 'Яркий день', 'ISO 50–200'], ['cloud', 'День и пасмурно', ''], ['uni', 'Универсальная', 'ISO 400'],
+    ['night', 'Вечер и ночь', 'ISO 800+'], ['lamp', 'Лампы (тунгстен)', 'неон, интерьер']
+  ];
+  var ICON = {
+    sun: '<circle cx="12" cy="12" r="5" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></g>',
+    cloud: '<circle cx="8" cy="9" r="4" fill="currentColor" opacity=".55"/><path d="M6 19h11a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 6 19z" fill="currentColor"/>',
+    uni: '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',
+    night: '<path d="M15 3a8.5 8.5 0 1 0 6 13.5A7 7 0 0 1 15 3z" fill="currentColor"/>',
+    lamp: '<path d="M12 2a6 6 0 0 0-3.5 10.9V16h7v-3.1A6 6 0 0 0 12 2z" fill="currentColor"/><path d="M9 18h6M10 21h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
+  };
+  function icon(k) { return '<svg class="fdb-ico" viewBox="0 0 24 24" aria-hidden="true">' + (ICON[k] || '') + '</svg>'; }
+  var TYPES = ['Цветной негатив', 'Ч/б негатив', 'Кинонегатив', 'Слайд (позитив)', 'Креатив / эффект', 'Ч/б хромоген'];
+  var TYPE_CLS = { 'Цветной негатив': 't-color', 'Ч/б негатив': 't-bw', 'Кинонегатив': 't-cine', 'Слайд (позитив)': 't-slide', 'Креатив / эффект': 't-art', 'Ч/б хромоген': 't-xp' };
+  var GRAIN = ['Очень мелкое', 'Мелкое', 'Среднее', 'Заметное', 'Крупное'];
+  var CONTRAST = ['Низкий', 'Средний', 'Высокий', 'Очень высокий'];
+  var DEV = ['C-41', 'Ч/б (D-76 и др.)', 'ECN-2 / C-41', 'E-6'];
+  var SUBJECTS = D.subjects;
+
+  var PRESETS = [
+    ['Портрет на улице', { subject: 'Портрет на улице' }],
+    ['Портрет в помещении', { subject: 'Портрет в помещении' }],
+    ['Яркое солнце', { light: ['sun'] }],
+    ['Пасмурно и туман', { light: ['cloud', 'uni'] }],
+    ['Вечер и ночь', { light: ['night', 'lamp'] }],
+    ['Стрит', { subject: 'Стрит' }],
+    ['Пейзаж', { subject: 'Пейзаж и природа' }],
+    ['Путешествия', { subject: 'Путешествия' }],
+    ['Классическая ч/б', { type: ['Ч/б негатив', 'Ч/б хромоген'] }],
+    ['Кино‑эстетика', { subject: 'Кино-эстетика' }],
+    ['До 1 000 ₽', { max: 1000, sort: 'price' }]
+  ];
+  var BUDGET = [600, 800, 1000, 1200, 1500, 2000, 2500, 3000, 99999];
+
+  function fresh() { return { subject: '', light: [], type: [], grain: [], contrast: [], dev: [], fmt: '135', max: 99999, q: '', sort: 'price', view: 'cards', preset: -1 }; }
+  var st = fresh();
+
+  function plural(n, one, few, many) { var m10 = n % 10, m100 = n % 100; return n + ' ' + (m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function rub(n) { return n == null ? '—' : n.toLocaleString('ru-RU').replace(/ /g, ' ') + ' ₽'; }
+  function minPrice(f, fmt) {
+    var p = f.prices.filter(function (x) { return !fmt || x.fmt === fmt; });
+    return p.length ? p.reduce(function (a, b) { return b.price < a.price ? b : a; }) : null;
+  }
+  function priceFor(f) { return st.fmt === 'any' ? minPrice(f) : minPrice(f, st.fmt); }
+
+  function match(f) {
+    if (st.fmt !== 'any' && f.formats.indexOf(st.fmt) === -1) return false;
+    if (st.subject && f.subjects.indexOf(st.subject) === -1) return false;
+    if (st.light.length && st.light.indexOf(f.light) === -1) return false;
+    if (st.type.length && st.type.indexOf(f.type) === -1) return false;
+    if (st.grain.length && st.grain.indexOf(f.grain) === -1) return false;
+    if (st.contrast.length && st.contrast.indexOf(f.contrast) === -1) return false;
+    if (st.dev.length && st.dev.indexOf(f.dev) === -1) return false;
+    if (st.max < 99999) { var p = priceFor(f); if (!p || p.price > st.max) return false; }
+    if (st.q) {
+      var hay = (f.name + ' ' + f.look + ' ' + f.purpose + ' ' + f.subjects.join(' ') + ' ' + f.note + ' ' + f.type).toLowerCase();
+      if (hay.indexOf(st.q.toLowerCase()) === -1) return false;
+    }
+    return true;
+  }
+  function sorted(list) {
+    var by = {
+      price: function (a, b) { var x = priceFor(a), y = priceFor(b); return (x ? x.price : 1e9) - (y ? y.price : 1e9); },
+      iso: function (a, b) { return a.iso - b.iso; },
+      name: function (a, b) { return a.name.localeCompare(b.name, 'ru'); },
+      grain: function (a, b) { return GRAIN.indexOf(a.grain) - GRAIN.indexOf(b.grain); }
+    }[st.sort];
+    return list.slice().sort(by);
+  }
+
+  function dots(val, scale, label) {
+    var i = scale.indexOf(val), s = '';
+    for (var k = 0; k < scale.length; k++) s += '<i class="' + (k <= i ? 'on' : '') + '"></i>';
+    return '<span class="fdb-meter" title="' + label + ': ' + esc(val) + '"><span class="fdb-meter-l">' + label + '</span><span class="fdb-dots">' + s + '</span><span class="fdb-meter-v">' + esc(val.toLowerCase()) + '</span></span>';
+  }
+  function lightLabel(k) { var l = LIGHT.filter(function (x) { return x[0] === k; })[0]; return l ? l[1] : ''; }
+
+  function pricesTable(f) {
+    var rows = f.prices.slice().sort(function (a, b) { return a.fmt === b.fmt ? a.price - b.price : a.fmt.localeCompare(b.fmt); });
+    var best = {};
+    rows.forEach(function (p) { if (!best[p.fmt] || p.price < best[p.fmt]) best[p.fmt] = p.price; });
+    return '<div class="table-wrap fdb-prices"><table><thead><tr><th>Магазин</th><th>Формат</th><th>Цена</th><th>Кадров</th><th>₽/кадр</th><th></th></tr></thead><tbody>' +
+      rows.map(function (p) {
+        return '<tr' + (p.price === best[p.fmt] ? ' class="best"' : '') + '><td>' + esc(p.shop) + '</td><td>' + esc(p.fmt) + (p.fmt === '135' ? '' : ' <span class="fdb-no-mx">не для MX</span>') + '</td><td><b>' + rub(p.price) + '</b></td><td>' + (p.frames || '—') + '</td><td>' + (p.perFrame ? rub(p.perFrame) : '—') + '</td><td>' +
+          (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">Купить ↗</a>' : '') + '</td></tr>' + (p.note ? '<tr class="fdb-pnote"><td colspan="6">' + esc(p.note) + '</td></tr>' : '');
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function card(f) {
+    var p = priceFor(f), p135 = minPrice(f, '135');
+    var mx = f.formats.indexOf('135') !== -1;
+    return '<div class="fdb-card" id="film-' + f.id + '">' +
+      '<div class="fdb-can ' + (TYPE_CLS[f.type] || '') + '" aria-hidden="true"><span class="fdb-can-iso">' + f.iso + '</span><span class="fdb-can-t">ISO</span></div>' +
+      '<div class="fdb-main">' +
+      '<h3 class="fdb-name">' + esc(f.name) + '</h3>' +
+      '<div class="fdb-tags"><span class="fdb-tag ' + (TYPE_CLS[f.type] || '') + '">' + esc(f.type) + '</span><span class="fdb-tag">' + icon(f.light) + esc(lightLabel(f.light)) + '</span><span class="fdb-tag">' + esc(f.dev) + '</span>' +
+      f.formats.map(function (x) { return '<span class="fdb-tag ' + (x === '135' ? 'fdb-mx' : 'fdb-dim') + '">' + x + (x === '135' ? ' · MX' : '') + '</span>'; }).join('') + '</div>' +
+      '<p class="fdb-look">' + esc(f.look) + '</p>' +
+      '<p class="fdb-for"><span>Для чего:</span> ' + esc(f.purpose) + '</p>' +
+      '<div class="fdb-meters">' + dots(f.grain, GRAIN, 'Зерно') + dots(f.contrast, CONTRAST, 'Контраст') + '</div>' +
+      (f.note ? '<p class="fdb-note">' + esc(f.note) + '</p>' : '') +
+      '<div class="fdb-buy">' + (p ? '<span class="fdb-from">от <b>' + rub(p.price) + '</b> · ' + esc(p.shop) + ' · ' + esc(p.fmt) + (p.perFrame ? ' · ' + rub(p.perFrame) + '/кадр' : '') + '</span>' : '<span class="fdb-from">нет в наличии в этом формате</span>') +
+      (!mx ? '<span class="fdb-warn">Только 120 — в Pentax MX не встанет</span>' : '') + '</div>' +
+      '<details class="fdb-det"><summary>Цены в магазинах (' + f.prices.length + ')</summary>' + pricesTable(f) +
+      '<p class="fdb-subj"><span>Сюжеты:</span> ' + f.subjects.map(esc).join(' · ') + '</p></details>' +
+      '</div></div>';
+  }
+
+  function tableView(list) {
+    return '<div class="table-wrap"><table class="fdb-table"><thead><tr><th>Плёнка</th><th>ISO</th><th>от, 135</th><th>Тип</th><th>Свет</th><th>Зерно</th><th>Контраст</th><th>от, 120</th></tr></thead><tbody>' +
+      list.map(function (f) {
+        var a = minPrice(f, '135'), b = minPrice(f, '120');
+        return '<tr><td><a href="#films" data-film="' + f.id + '">' + esc(f.name) + '</a></td><td>' + f.iso + '</td><td class="fdb-tp">' + (a ? rub(a.price) + '<small>' + esc(a.shop) + '</small>' : '—') + '</td><td><span class="fdb-sw ' + (TYPE_CLS[f.type] || '') + '"></span>' + esc(f.type) + '</td><td title="' + esc(lightLabel(f.light)) + '">' + icon(f.light) + '</td><td>' + esc(f.grain) + '</td><td>' + esc(f.contrast) + '</td><td>' + (b ? rub(b.price) : '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function chips(name, opts, sel, labelFn, iconFn) {
+    return '<div class="fdb-chips" data-k="' + name + '">' + opts.map(function (o) {
+      var v = Array.isArray(o) ? o[0] : o, lab = labelFn ? labelFn(o) : v;
+      return '<button type="button" class="fdb-chip" data-v="' + esc(v) + '" aria-pressed="' + (sel.indexOf(v) !== -1) + '">' + (iconFn ? iconFn(v) : '') + esc(lab) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  var root = null;
+  function shell() {
+    var counts = {}; FILMS.forEach(function (f) { f.prices.forEach(function (p) { counts[p.shop] = (counts[p.shop] || 0) + 1; }); });
+    var nPrices = FILMS.reduce(function (a, f) { return a + f.prices.length; }, 0);
+    return '<h1>Справочник плёнок</h1>' +
+      '<p class="fdb-lead">' + FILMS.length + ' плёнок, ' + nPrices + ' цен в ' + SHOPS.length + ' магазинах. Выберите сюжет и свет — справочник покажет, что брать. Цены проверены <b>' + esc(D.priceDate) + '</b>, перед покупкой сверьте на сайте магазина.</p>' +
+      '<section class="fdb-panel" aria-label="Подбор плёнки">' +
+      '<div class="fdb-row"><span class="fdb-lab">Быстрый выбор</span><div class="fdb-presets">' + PRESETS.map(function (p, i) { return '<button type="button" class="fdb-preset" data-i="' + i + '">' + esc(p[0]) + '</button>'; }).join('') + '</div></div>' +
+      '<div class="fdb-grid">' +
+      '<label class="fdb-field"><span class="fdb-lab">Сюжет</span><select id="fdbSubj"><option value="">Любой</option>' + SUBJECTS.map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="fdb-field"><span class="fdb-lab">Слово в описании</span><input id="fdbQ" type="search" placeholder="неон, тёплый, кожа…"></label>' +
+      '<label class="fdb-field"><span class="fdb-lab">Цена плёнки до</span><span class="fdb-range"><input id="fdbMax" type="range" min="0" max="' + (BUDGET.length - 1) + '" step="1" value="' + (BUDGET.length - 1) + '"><output id="fdbMaxV">без ограничения</output></span></label>' +
+      '</div>' +
+      '<div class="fdb-row"><span class="fdb-lab">Свет</span><div id="fdbLight"></div></div>' +
+      '<div class="fdb-row"><span class="fdb-lab">Тип</span><div id="fdbType"></div></div>' +
+      '<div class="fdb-row"><span class="fdb-lab">Формат</span><div class="fdb-chips" id="fdbFmt"></div></div>' +
+      '<details class="fdb-more"><summary>Ещё фильтры: зерно, контраст, проявка</summary>' +
+      '<div class="fdb-row"><span class="fdb-lab">Зерно</span><div id="fdbGrain"></div></div>' +
+      '<div class="fdb-row"><span class="fdb-lab">Контраст</span><div id="fdbContrast"></div></div>' +
+      '<div class="fdb-row"><span class="fdb-lab">Проявка</span><div id="fdbDev"></div></div></details>' +
+      '</section>' +
+      '<div class="fdb-bar"><span id="fdbCount" class="fdb-count" aria-live="polite"></span>' +
+      '<label class="fdb-sort"><span class="fdb-lab">Сортировка</span><select id="fdbSort"><option value="price">по цене</option><option value="iso">по ISO</option><option value="grain">по зерну</option><option value="name">по названию</option></select></label>' +
+      '<div class="fdb-chips" id="fdbView"></div><button type="button" class="fdb-reset" id="fdbReset">Сбросить</button></div>' +
+      '<div id="fdbList"></div>' +
+      '<h2 id="shops">Магазины и лаборатории</h2>' +
+      '<p class="fdb-lead">Адреса и часы — с сайтов магазинов, проверено ' + esc(D.shopsChecked) + '.</p>' +
+      '<div class="fdb-shops">' + SHOPS.map(function (s) {
+        return '<section class="fdb-shop"><h3>' + esc(s.name) + '</h3><p class="fdb-shop-meta">' + esc(s.city) + ' · ' + plural(counts[s.name] || 0, 'предложение', 'предложения', 'предложений') + ' в справочнике</p>' +
+          '<ul>' + s.points.map(function (p) { return '<li><b>' + esc(p[0]) + '</b><span>' + esc(p[1]) + '</span>' + (p[2] ? '<small>' + esc(p[2]) + '</small>' : '') + '</li>'; }).join('') + '</ul>' +
+          '<p class="fdb-shop-c">' + (s.hours ? esc(s.hours) + '<br>' : '') + (s.phone ? 'Телефон: <span class="sel">' + esc(s.phone) + '</span><br>' : '') + '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.site) + ' ↗</a></p></section>';
+      }).join('') + '</div>' +
+      '<p class="fdb-src">Источник: личный архив плёнок автора курса (таблица «Архив фотоплёнок»). Описания характера плёнок — по данным магазинов и опыту фотографов.</p>';
+  }
+
+  function syncControls() {
+    var q = function (s) { return root.querySelector(s); };
+    q('#fdbLight').innerHTML = chips('light', LIGHT, st.light, function (o) { return o[1]; }, icon);
+    q('#fdbType').innerHTML = chips('type', TYPES, st.type, null, function (v) { return '<span class="fdb-sw ' + TYPE_CLS[v] + '"></span>'; });
+    q('#fdbGrain').innerHTML = chips('grain', GRAIN, st.grain);
+    q('#fdbContrast').innerHTML = chips('contrast', CONTRAST, st.contrast);
+    q('#fdbDev').innerHTML = chips('dev', DEV, st.dev);
+    q('#fdbFmt').innerHTML = [['135', '135 · подходит для MX'], ['120', '120 (средний формат)'], ['any', 'Любой']].map(function (o) {
+      return '<button type="button" class="fdb-chip" data-fmt="' + o[0] + '" aria-pressed="' + (st.fmt === o[0]) + '">' + o[1] + '</button>';
+    }).join('');
+    q('#fdbView').innerHTML = [['cards', 'Карточки'], ['table', 'Таблица']].map(function (o) {
+      return '<button type="button" class="fdb-chip" data-view="' + o[0] + '" aria-pressed="' + (st.view === o[0]) + '">' + o[1] + '</button>';
+    }).join('');
+    q('#fdbSubj').value = st.subject; q('#fdbQ').value = st.q; q('#fdbSort').value = st.sort;
+    q('#fdbMax').value = BUDGET.indexOf(st.max) === -1 ? BUDGET.length - 1 : BUDGET.indexOf(st.max);
+    q('#fdbMaxV').textContent = st.max >= 99999 ? 'без ограничения' : rub(st.max);
+    root.querySelectorAll('.fdb-preset').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.i === st.preset)); });
+  }
+  function draw() {
+    var list = sorted(FILMS.filter(match));
+    var c = root.querySelector('#fdbCount');
+    c.textContent = list.length ? 'Найдено плёнок: ' + list.length : 'Ничего не нашлось';
+    root.querySelector('#fdbList').innerHTML = list.length ? (st.view === 'table' ? tableView(list) : '<div class="fdb-cards">' + list.map(card).join('') + '</div>') :
+      '<p class="fdb-empty">Под эти условия плёнок нет. Уберите один из фильтров или нажмите «Сбросить».</p>';
+  }
+  function update() { syncControls(); draw(); }
+
+  function bind() {
+    root.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); var a = e.target.closest('a[data-film]');
+      if (a) { e.preventDefault(); st.view = 'cards'; update(); var el = root.querySelector('#film-' + a.dataset.film); if (el) { el.scrollIntoView({ block: 'start' }); el.querySelector('details').open = true; } return; }
+      if (!b) return;
+      if (b.classList.contains('fdb-preset')) {
+        var i = +b.dataset.i, keepFmt = st.fmt, keepView = st.view;
+        if (st.preset === i) { st = fresh(); } else { st = fresh(); Object.keys(PRESETS[i][1]).forEach(function (k) { st[k] = PRESETS[i][1][k]; }); st.preset = i; }
+        st.fmt = keepFmt; st.view = keepView; update(); return;
+      }
+      if (b.id === 'fdbReset') { st = fresh(); update(); return; }
+      if (b.dataset.fmt) { st.fmt = b.dataset.fmt; update(); return; }
+      if (b.dataset.view) { st.view = b.dataset.view; update(); return; }
+      var box = b.closest('.fdb-chips'); if (!box || !box.dataset.k) return;
+      var arr = st[box.dataset.k], v = b.dataset.v, idx = arr.indexOf(v);
+      if (idx === -1) arr.push(v); else arr.splice(idx, 1);
+      st.preset = -1; update();
+    });
+    root.querySelector('#fdbSubj').addEventListener('change', function (e) { st.subject = e.target.value; st.preset = -1; update(); });
+    root.querySelector('#fdbSort').addEventListener('change', function (e) { st.sort = e.target.value; draw(); });
+    root.querySelector('#fdbQ').addEventListener('input', function (e) { st.q = e.target.value.trim(); st.preset = -1; draw(); });
+    root.querySelector('#fdbMax').addEventListener('input', function (e) { st.max = BUDGET[+e.target.value]; st.preset = -1; root.querySelector('#fdbMaxV').textContent = st.max >= 99999 ? 'без ограничения' : rub(st.max); draw(); });
+  }
+
+  function render(content) {
+    content.innerHTML = shell();
+    root = content;
+    bind(); update();
+  }
+
+  function callout(num, content) {
+    if (num !== '05' && num !== '03') return;
+    var h = [].filter.call(content.querySelectorAll('h2'), function (x) { return /^(5\.9|3\.12)\./.test(x.textContent.trim()); })[0];
+    if (!h) return;
+    var a = document.createElement('a'); a.href = '#films'; a.className = 'fdb-callout';
+    a.innerHTML = '<b>Справочник плёнок →</b><span>' + FILMS.length + ' плёнок с фильтрами по сюжету и свету, цены в трёх магазинах</span>';
+    h.insertAdjacentElement('afterend', a);
+  }
+  var searchText = FILMS.map(function (f) { return f.name + ' ' + f.look + ' ' + f.purpose + ' ' + f.subjects.join(' ') + ' ' + f.type; }).join(' ').toLowerCase() + ' справочник плёнок магазины цены';
+  return { render: render, callout: callout, searchText: searchText, count: FILMS.length };
+})();

@@ -1,0 +1,108 @@
+/* ===== Справочник плёнок ===== */
+.fdb-lead { color: var(--muted); font-size: 15px; }
+.fdb-lead b { color: var(--fg); }
+.fdb-panel { display: flex; flex-direction: column; gap: 14px; padding: 16px; margin: 20px 0 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.fdb-row { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: start; }
+.fdb-lab { font: 600 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 7px; }
+.fdb-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fdb-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fdb-field .fdb-lab { padding-top: 0; }
+.fdb-field select, .fdb-field input[type=search], .fdb-sort select {
+  font: 14px var(--font-mono); padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; width: 100%; }
+.fdb-range { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 37px; }
+.fdb-range input { width: 100%; accent-color: var(--accent); }
+.fdb-range output { font: 600 13px var(--font-mono); color: #fff; white-space: nowrap; }
+.fdb-presets, .fdb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fdb-preset, .fdb-chip, .fdb-reset {
+  display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px var(--font-mono); padding: 7px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--raised); color: var(--fg); cursor: pointer; }
+.fdb-preset { border-color: #2b3f72; }
+.fdb-preset:hover, .fdb-chip:hover, .fdb-reset:hover { border-color: var(--accent); }
+.fdb-preset[aria-pressed="true"] { background: var(--amber); border-color: var(--amber); color: #1a0f02; }
+.fdb-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #06102a; }
+.fdb-ico { width: 15px; height: 15px; flex: none; vertical-align: -3px; }
+.fdb-more summary { cursor: pointer; font: 600 12.5px var(--font-mono); color: var(--accent); }
+.fdb-more[open] summary { margin-bottom: 12px; }
+.fdb-more .fdb-row + .fdb-row { margin-top: 12px; }
+.fdb-bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin: 10px 0 16px; }
+.fdb-count { font: 700 15px var(--font-mono); color: #fff; margin-right: auto; }
+.fdb-sort { display: flex; gap: 8px; align-items: center; }
+.fdb-sort .fdb-lab { padding: 0; }
+.fdb-sort select { width: auto; }
+
+/* film type colours = the colour of the film base / box */
+.t-color { --t: #e0823a; } .t-bw { --t: #b9c0cc; } .t-cine { --t: #c4453b; } .t-slide { --t: #4f8cff; } .t-art { --t: #b06cf0; } .t-xp { --t: #7fb0c9; }
+.fdb-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--t, var(--muted)); flex: none; }
+
+.fdb-cards { display: flex; flex-direction: column; gap: 12px; }
+.fdb-card { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(180deg, var(--surface), #08101f); scroll-margin-top: 70px; }
+.fdb-can { position: relative; height: 96px; border-radius: 8px; background: linear-gradient(90deg, #0b0f19, #232a3a 45%, #0b0f19); border: 1px solid #2a3552;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+.fdb-can::before { content: ""; position: absolute; left: 0; right: 0; top: 30%; height: 40%; background: var(--t); opacity: .9; }
+.fdb-can-iso { position: relative; font: 800 18px var(--font-mono); color: #0a0d14; }
+.fdb-can-t { position: relative; font: 700 9px var(--font-mono); color: #0a0d14; letter-spacing: .1em; }
+.fdb-main { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.fdb-name { margin: 0 !important; font-size: 18px; color: #fff; }
+.fdb-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.fdb-tag { display: inline-flex; align-items: center; gap: 5px; font: 600 11.5px var(--font-mono); padding: 3px 8px; border-radius: 6px; background: var(--raised); color: var(--fg); border: 1px solid transparent; }
+.fdb-tag[class*=" t-"] { border-color: var(--t); color: var(--t); background: transparent; }
+.fdb-mx { color: #3ddc84; border-color: rgba(61,220,132,.4); background: transparent; }
+.fdb-dim { color: var(--muted); }
+.fdb-look { margin: 0 !important; font-size: 15px; }
+.fdb-for, .fdb-subj { margin: 0 !important; font-size: 14px; color: var(--muted); }
+.fdb-for span, .fdb-subj span { color: var(--fg); font-weight: 700; }
+.fdb-note { margin: 0 !important; font-size: 13.5px; color: #ffc93c; }
+.fdb-meters { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+.fdb-meter { display: inline-flex; align-items: center; gap: 8px; font: 12px var(--font-mono); }
+.fdb-meter-l { color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
+.fdb-dots { display: inline-flex; gap: 3px; }
+.fdb-dots i { width: 9px; height: 9px; border-radius: 2px; background: #1f2a45; }
+.fdb-dots i.on { background: var(--accent); }
+.fdb-meter-v { color: var(--fg); }
+.fdb-buy { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.fdb-from { font: 13.5px var(--font-mono); color: var(--muted); }
+.fdb-from b { font-size: 17px; color: var(--amber); }
+.fdb-warn, .fdb-no-mx { font: 600 11.5px var(--font-mono); color: #ff8a7a; }
+.fdb-det summary { cursor: pointer; font: 600 12.5px var(--font-mono); color: var(--accent); width: fit-content; }
+.fdb-det[open] summary { margin-bottom: 8px; }
+.fdb-prices { margin: 8px 0 !important; }
+.fdb-prices table { font-size: 13px !important; }
+.fdb-prices tr.best td { background: rgba(240,168,74,.08); }
+.fdb-prices tr.best b { color: var(--amber); }
+.fdb-pnote td { font-size: 12px; color: var(--muted); padding-top: 0 !important; }
+.fdb-empty { padding: 24px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; color: var(--muted); }
+.fdb-table td small { display: block; font-size: 11px; color: var(--muted); }
+.fdb-table td .fdb-sw { margin-right: 6px; }
+.fdb-table td a { text-decoration: none; font-weight: 700; }
+.fdb-table td.fdb-tp { color: var(--amber); font-weight: 700; }
+.fdb-table td { white-space: nowrap; }
+.fdb-table td:first-child { white-space: normal; min-width: 160px; }
+
+.fdb-shops { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fdb-shop { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fdb-shop h3 { margin: 0 !important; font-size: 17px; color: #fff; }
+.fdb-shop-meta { margin: 0 !important; font: 12px var(--font-mono); color: var(--amber); }
+.fdb-shop ul { list-style: none; padding: 0 !important; margin: 4px 0 !important; display: flex; flex-direction: column; gap: 8px; }
+.fdb-shop li { margin: 0 !important; display: flex; flex-direction: column; font-size: 13.5px; line-height: 1.45; }
+.fdb-shop li b { color: #fff; font-size: 13px; }
+.fdb-shop li small { color: var(--muted); font-size: 12px; }
+.fdb-shop-c { margin: auto 0 0 !important; font-size: 13px; color: var(--muted); }
+.fdb-shop-c .sel { color: var(--fg); user-select: all; }
+.fdb-src { font-size: 13px; color: var(--muted); margin-top: 20px !important; }
+.fdb-callout { display: flex; flex-direction: column; gap: 2px; margin: 12px 0 18px; padding: 14px 16px; border-radius: 10px; text-decoration: none;
+  background: linear-gradient(90deg, #17306b, #0d1a3c); border: 1px solid #2b4c95; color: var(--fg); }
+.fdb-callout b { color: var(--amber); font-size: 15px; }
+.fdb-callout span { font-size: 13.5px; color: var(--muted); }
+.fdb-callout:hover { border-color: var(--amber); }
+.nav-item[data-id="films"] .nav-num { color: var(--accent); }
+
+@media (max-width: 760px) {
+  .fdb-grid { grid-template-columns: minmax(0, 1fr); }
+  .fdb-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .fdb-lab { padding-top: 0; }
+  .fdb-shops { grid-template-columns: minmax(0, 1fr); }
+  .fdb-card { grid-template-columns: 46px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  .fdb-can { height: 72px; }
+  .fdb-can-iso { font-size: 14px; }
+  .fdb-panel { padding: 14px; }
+}
